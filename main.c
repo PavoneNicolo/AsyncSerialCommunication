@@ -28,9 +28,9 @@
 #define StateIDLE 0x10
 #define StateSEND 0x20
 #define StateRECEIVE 0x30
+#define StateEMPTYTX 0x40
 #define SYSCLK 80000000L
 #define DESIRED_BAUDRATE 9600
-#define RE  LATDbits.LATD8
 #define DE  LATDbits.LATD11
 
 /*
@@ -40,7 +40,7 @@ void delay(int t) { // 1 ms di delay
         n--;
     }
 }
- */
+*/
 
 void initializeUART();
 void initializePortsIO();
@@ -51,44 +51,43 @@ int newButtonState;
 char state = StatePOR;
 char sendRdy = 1;
 char receiveRdy = 0;
-char data = 0;
+char emptyTx = 0;
+char data;
 
 int main(void) {
-
     initializePortsIO();
     initializeUART();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
 
-    int d13Pressed;
+    int d4Pressed;
     LATDbits.LATD7 = 0;
+    DE = 0;
 
     while (1) {
 
-        d13Pressed = CheckButton(PORTGbits.RG6);
+        d4Pressed = CheckButton(PORTDbits.RD6);
 
         switch (state) {
             case StatePOR:
                 state = StateIDLE;
                 break;
             case StateIDLE:
-                //rimango in ascolto sul canale
-                RE = 0;
-                DE = 0;
+                if (emptyTx) {
+                    state = StateEMPTYTX;
+                }
 
-                if (d13Pressed && sendRdy) {
+                if (d4Pressed && sendRdy) {
+                    DE = 1;
                     state = StateSEND;
                 }
 
                 if (receiveRdy) {
                     state = StateRECEIVE;
                 }
-
                 break;
             case StateSEND:
-                //TODO: capire come fare il send e come/quando settare i flag
-                RE = 0;
-                DE = 1;
+                state = StateIDLE;
                 sendRdy = 0;
                 putcUART1('A'); // Transmit 'A' through UART
                 break;
@@ -98,6 +97,12 @@ int main(void) {
                 if (data == 'B') {
                     LATDbits.LATD7 = LATDbits.LATD7 ^ 1;
                 }
+                break;
+            case StateEMPTYTX:
+                while (BusyUART1());
+                DE = 0;
+                emptyTx = 0;
+                state = StateIDLE;
                 break;
             default:
                 break;
@@ -118,8 +123,8 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
     //chiama l'interrupt quando ha finito di trasmettere
     if (mU1TXGetIntFlag()) {
         mU1TXClearIntFlag();
-        state = StateIDLE;
         sendRdy = 1;
+        emptyTx = 1;
     }
 }
 
@@ -127,7 +132,7 @@ void initializeUART() {
     // Optimize PIC32 performance and return peripheral bus frequency
     unsigned int pbClk = SYSTEMConfig(SYSCLK, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
     // Abilita UART1 and set baud rate to DESIRED_BAUDRATE=9600
-    OpenUART1(UART_EN, UART_RX_ENABLE | UART_TX_ENABLE, pbClk / 16 / DESIRED_BAUDRATE - 1);
+    OpenUART1(UART_EN | UART_ODD_PAR_8BIT, UART_RX_ENABLE | UART_TX_ENABLE, pbClk / 16 / DESIRED_BAUDRATE - 1);
     // Configure UART1 RX Interrupt
     ConfigIntUART1(UART_INT_PR2 | UART_RX_INT_EN | UART_TX_INT_EN);
     while (BusyUART1());
@@ -137,17 +142,12 @@ void initializePortsIO() {
     //R0 -- Rx D0 -> settato da config di UART
     //DI -- Tx D1 -> settato da config di UART
     TRISGbits.TRISG6 = 1; //D13 bottone
+    TRISDbits.TRISD6 = 1; //D4 bottone
     TRISDbits.TRISD7 = 0; //D5 LED
-    TRISDbits.TRISD8 = 0; //D6 RE  Read Enable
     TRISDbits.TRISD11 = 0; //D7 DE  Send Enable
-    /*
-     RE: attivazione uscita del ricevitore (attivazione a livello basso)
-     DE: attivazione uscita Driver (attivazione a livello alto)
-     */
 }
 
 //controllo se un bottone è stato premuto
-
 char CheckButton(unsigned port) {
     int temp = 0;
     newButtonState = !port;
