@@ -40,7 +40,7 @@ void delay(int t) { // 1 ms di delay
         n--;
     }
 }
-*/
+ */
 
 void initializeUART();
 void initializePortsIO();
@@ -53,6 +53,7 @@ char sendRdy = 1;
 char receiveRdy = 0;
 char emptyTx = 0;
 char data;
+char str[7] = {'A', 'I', 'O', 'C', 'O', 'N', 'A'};
 
 int main(void) {
     initializePortsIO();
@@ -74,6 +75,7 @@ int main(void) {
                 break;
             case StateIDLE:
                 if (emptyTx) {
+                    sendRdy = 0;
                     state = StateEMPTYTX;
                 }
 
@@ -89,7 +91,8 @@ int main(void) {
             case StateSEND:
                 state = StateIDLE;
                 sendRdy = 0;
-                putcUART1('A'); // Transmit 'A' through UART
+                //putcUART1('A'); // Transmit 'A' through UART
+                putsUART1(str);
                 break;
             case StateRECEIVE:
                 receiveRdy = 0;
@@ -102,6 +105,7 @@ int main(void) {
                 while (BusyUART1());
                 DE = 0;
                 emptyTx = 0;
+                sendRdy = 1;
                 state = StateIDLE;
                 break;
             default:
@@ -148,6 +152,7 @@ void initializePortsIO() {
 }
 
 //controllo se un bottone è stato premuto
+
 char CheckButton(unsigned port) {
     int temp = 0;
     newButtonState = !port;
