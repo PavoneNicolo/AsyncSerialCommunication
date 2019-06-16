@@ -75,7 +75,7 @@ int main(void) {
                 break;
             case StateIDLE:
                 if (emptyTx) {
-                    sendRdy = 0;
+                    //sendRdy = 0;
                     state = StateEMPTYTX;
                 }
 
@@ -120,14 +120,15 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
     if (mU1RXGetIntFlag()) {
         // Clear the RX interrupt Flag
         mU1RXClearIntFlag();
-        data = (char) ReadUART1(); // Read data from Rx
+        // Read data from Rx
+        data = (char) ReadUART1(); 
         receiveRdy = 1;
     }
 
     //chiama l'interrupt quando ha finito di trasmettere
     if (mU1TXGetIntFlag()) {
         mU1TXClearIntFlag();
-        sendRdy = 1;
+        //sendRdy = 1;
         emptyTx = 1;
     }
 }
@@ -148,11 +149,11 @@ void initializePortsIO() {
     TRISGbits.TRISG6 = 1; //D13 bottone
     TRISDbits.TRISD6 = 1; //D4 bottone
     TRISDbits.TRISD7 = 0; //D5 LED
-    TRISDbits.TRISD11 = 0; //D7 DE  Send Enable
+    TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
-//controllo se un bottone è stato premuto
 
+//controllo se un bottone è stato premuto -- pull up
 char CheckButton(unsigned port) {
     int temp = 0;
     newButtonState = !port;
