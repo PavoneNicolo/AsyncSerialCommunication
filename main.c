@@ -35,7 +35,7 @@
 
 /*
 void delay(int t) { // 1 ms di delay
-    int n = t * 1900; //1900 è un numero ricavato sperimentalmente
+    int n = t * 1900; //1900 Ã¨ un numero ricavato sperimentalmente
     while (n > 0) {
         n--;
     }
@@ -91,8 +91,8 @@ int main(void) {
             case StateSEND:
                 state = StateIDLE;
                 sendRdy = 0;
-                //putcUART1('A'); // Transmit 'A' through UART
-                putsUART1(str);
+                putcUART1('A'); // Transmit 'A' through UART
+                //putsUART1(str);
                 break;
             case StateRECEIVE:
                 receiveRdy = 0;
@@ -153,7 +153,7 @@ void initializePortsIO() {
 }
 
 
-//controllo se un bottone è stato premuto -- pull up
+//controllo se un bottone Ã¨ stato premuto -- pull up
 char CheckButton(unsigned port) {
     int temp = 0;
     newButtonState = !port;
