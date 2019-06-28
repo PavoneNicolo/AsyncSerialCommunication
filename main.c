@@ -44,6 +44,17 @@
 #define PAIRBTN PORTDbits.RD0
 #define PAIRLED LATDbits.LATD1
 
+<<<<<<< HEAD
+=======
+/*
+void delay(int t) { // 1 ms di delay
+    int n = t * 1900; //1900 è un numero ricavato sperimentalmente
+    while (n > 0) {
+        n--;
+    }
+}
+ */
+>>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 
 void initializeUART();
 void initializePortsIO();
@@ -54,6 +65,7 @@ char state = StatePOR;
 char sendRdy = 1;
 char receiveRdy = 0;
 char emptyTx = 0;
+<<<<<<< HEAD
 char deviceList[4] = {0x01, 0x01, 0x02, 0x04}; // 0x01 = deviceID , 0x01 = deviceType(LED)
 char data = 0x00;
 char address = 0x00;
@@ -61,6 +73,10 @@ char matchedAddress = 0;
 int msgDuration = 0;
 char i = 0;
 char command;
+=======
+char data;
+char str[7] = {'A', 'I', 'O', 'C', 'O', 'N', 'A'};
+>>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 
 int main(void) {
     initializePortsIO();
@@ -113,6 +129,7 @@ int main(void) {
 
             case StateIDLE:
                 if (emptyTx) {
+                    //sendRdy = 0;
                     state = StateEMPTYTX;
                 }
                 if (d4Pressed && sendRdy) {
@@ -165,7 +182,12 @@ int main(void) {
             case StateSEND:
                 state = StateIDLE;
                 sendRdy = 0;
+<<<<<<< HEAD
                 putcUART1('A');
+=======
+                putcUART1('A'); // Transmit 'A' through UART
+                //putsUART1(str);
+>>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
                 break;
             case StateRECEIVE:
                 receiveRdy = 0;
@@ -181,6 +203,7 @@ int main(void) {
                 while (BusyUART1());
                 DE = 0;
                 emptyTx = 0;
+                sendRdy = 1;
                 state = StateIDLE;
                 break;
             default:
@@ -195,13 +218,14 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
     if (mU1RXGetIntFlag()) {
         // Clear the RX interrupt Flag
         mU1RXClearIntFlag();
-        data = (char) ReadUART1(); // Read data from Rx
+        // Read data from Rx
+        data = (char) ReadUART1(); 
         receiveRdy = 1;
     }
     //chiama l'interrupt quando ha finito di trasmettere
     if (mU1TXGetIntFlag()) {
         mU1TXClearIntFlag();
-        sendRdy = 1;
+        //sendRdy = 1;
         emptyTx = 1;
     }
 }
@@ -225,19 +249,29 @@ void initializePortsIO() {
     TRISDbits.TRISD0 = 1; //D2 BUT del pinguino
     TRISDbits.TRISD4 = 1; //D2 BUT del pinguino 
     TRISDbits.TRISD7 = 0; //D5 LED
-    TRISDbits.TRISD11 = 0; //D7 DE  Send Enable
+    TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
+<<<<<<< HEAD
 //controllo se un bottone � stato premuto
 
 char CheckButton(unsigned port, int oldBtnIndex) {
     char temp = 0;
     if (oldButtonStates[oldBtnIndex] & !port) {
+=======
+
+//controllo se un bottone è stato premuto -- pull up
+char CheckButton(unsigned port) {
+    int temp = 0;
+    newButtonState = !port;
+    if (oldButtonState > newButtonState) {
+>>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
         temp = 1;
     }
     oldButtonStates[oldBtnIndex] = port;
     return temp;
 }
+<<<<<<< HEAD
 
 void SerialSend(char body[], int length) {
     char message[length + 3];
@@ -253,3 +287,5 @@ void SerialSend(char body[], int length) {
     while (BusyUART1());
     DE = 0;
 }
+=======
+>>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
