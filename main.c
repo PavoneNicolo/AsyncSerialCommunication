@@ -24,81 +24,160 @@
 #include <p32xxxx.h>
 #include <plib.h> // Include the PIC32 Peripheral Library.
 
+//STATES
 #define StatePOR 0x00
+#define StatePAIRING 0x05
 #define StateIDLE 0x10
-#define StateSEND 0x20
-#define StateRECEIVE 0x30
-#define StateEMPTYTX 0x40
+#define StateRECEIVE 0x20
+#define StateREAD 0x21
+#define StateDISCARD 0x22
+#define StatePROCESS 0x25
+#define StateSEND 0x30
+#define StateEMPTYTX 0x35
+
+#define CmdCOLLECT 0x01
+#define CmdCOMMAND 0x02
+
 #define SYSCLK 80000000L
 #define DESIRED_BAUDRATE 9600
-#define DE  LATDbits.LATD11
+#define DE LATDbits.LATD11
+#define PAIRBTN PORTDbits.RD0
+#define PAIRLED LATDbits.LATD1
 
-/*
-void delay(int t) { // 1 ms di delay
-    int n = t * 1900; //1900 è un numero ricavato sperimentalmente
-    while (n > 0) {
-        n--;
-    }
-}
-*/
 
 void initializeUART();
 void initializePortsIO();
-char CheckButton(unsigned port);
-
-int oldButtonState;
-int newButtonState;
+char CheckButton(unsigned port, int oldBtnIndex);
+void SerialSend(char body[], int length);
+int oldButtonStates[2] = {1, 1};
 char state = StatePOR;
 char sendRdy = 1;
 char receiveRdy = 0;
 char emptyTx = 0;
-char data;
+char deviceList[4] = {0x01, 0x01, 0x02, 0x04}; // 0x01 = deviceID , 0x01 = deviceType(LED)
+char data = 0x00;
+char address = 0x00;
+char matchedAddress = 0;
+int msgDuration = 0;
+char i = 0;
+char command;
 
 int main(void) {
     initializePortsIO();
     initializeUART();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
+    char *msgBody;
 
     int d4Pressed;
+    int d2Pressed;
     LATDbits.LATD7 = 0;
     DE = 0;
+    PAIRLED = 0;
 
     while (1) {
 
-        d4Pressed = CheckButton(PORTDbits.RD6);
+        d4Pressed = CheckButton(PORTDbits.RD6, 0);
+        d2Pressed = CheckButton(PAIRBTN, 1);
+
 
         switch (state) {
             case StatePOR:
-                state = StateIDLE;
+                //stato di primo boot :(address = 0;)
+                //non è nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale 
+                if (d2Pressed) {
+                    PAIRLED = 1;
+                    address = 0xFF;
+                    state = StatePAIRING;
+                    receiveRdy = 0;
+                }
+
                 break;
+            case StatePAIRING:
+                if (receiveRdy) {
+                    if (data == address) {
+                        DE = 1;
+                        putcUART1(0xFF);
+                        while (BusyUART1());
+                        DE = 0;
+                    } else {
+                        address = data;
+                        state = StateIDLE;
+                        PAIRLED = 0;
+                        int length = sizeof (deviceList) / sizeof (char);
+                        SerialSend(deviceList, length);
+                    }
+                    receiveRdy = 0;
+                }
+                break;
+
             case StateIDLE:
                 if (emptyTx) {
                     state = StateEMPTYTX;
                 }
-
                 if (d4Pressed && sendRdy) {
                     DE = 1;
                     state = StateSEND;
                 }
-
                 if (receiveRdy) {
                     state = StateRECEIVE;
+                    if (msgDuration) {
+                        if (matchedAddress) {
+                            state = StateREAD;
+                        } else {
+                            state = StateDISCARD;
+                        }
+                    }
+                }
+                break;
+            case StateREAD:
+                //malloc richiede memoria nell'heap, assegnata nelle proprietà del progetto
+                msgBody = (char*) malloc(msgDuration * sizeof (char));
+                while (msgDuration != 0) {
+                    if (receiveRdy) {
+                        msgBody[sizeof (msgBody) - msgDuration] = data;
+                    }
+                }
+                state = StatePROCESS;
+                break;
+            case StateDISCARD:
+                if (msgDuration == 0) {
+                    state = StateIDLE;
+                    matchedAddress = 0;
+                }
+                break;
+            case StatePROCESS:
+                command = msgBody[0];
+                switch (command) {
+                    case CmdCOLLECT:
+                        //ciclo tutti i device che sono richiesti nel body
+                        for (i = 0; i< sizeof (msgBody) - 1; i++) {
+                            //TODO 
+                            // usare questi DeviceID per fare cose
+                        }
+                        break;
+                    case CmdCOMMAND:
+                        break;
+                    default:
+                        break;
                 }
                 break;
             case StateSEND:
                 state = StateIDLE;
                 sendRdy = 0;
-                putcUART1('A'); // Transmit 'A' through UART
+                putcUART1('A');
                 break;
             case StateRECEIVE:
                 receiveRdy = 0;
                 state = StateIDLE; // torno in IDLE solo quando finisco di leggere i dati
-                if (data == 'B') {
-                    LATDbits.LATD7 = LATDbits.LATD7 ^ 1;
-                }
+                if (data == address)
+                    matchedAddress = 1;
+                else
+                    matchedAddress = 0;
+                while (!receiveRdy);
+                msgDuration = data;
                 break;
-            case StateEMPTYTX:
+            case StateEMPTYTX: //TODO fulminare questo state in quanto sarà incluso in un metodo di send futuro
                 while (BusyUART1());
                 DE = 0;
                 emptyTx = 0;
@@ -119,7 +198,6 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
         data = (char) ReadUART1(); // Read data from Rx
         receiveRdy = 1;
     }
-
     //chiama l'interrupt quando ha finito di trasmettere
     if (mU1TXGetIntFlag()) {
         mU1TXClearIntFlag();
@@ -143,17 +221,35 @@ void initializePortsIO() {
     //DI -- Tx D1 -> settato da config di UART
     TRISGbits.TRISG6 = 1; //D13 bottone
     TRISDbits.TRISD6 = 1; //D4 bottone
+    TRISDbits.TRISD1 = 0; //LED2
+    TRISDbits.TRISD0 = 1; //D2 BUT del pinguino
+    TRISDbits.TRISD4 = 1; //D2 BUT del pinguino 
     TRISDbits.TRISD7 = 0; //D5 LED
     TRISDbits.TRISD11 = 0; //D7 DE  Send Enable
 }
 
 //controllo se un bottone è stato premuto
-char CheckButton(unsigned port) {
-    int temp = 0;
-    newButtonState = !port;
-    if (oldButtonState > newButtonState) {
+
+char CheckButton(unsigned port, int oldBtnIndex) {
+    char temp = 0;
+    if (oldButtonStates[oldBtnIndex] & !port) {
         temp = 1;
     }
-    oldButtonState = !port;
+    oldButtonStates[oldBtnIndex] = port;
     return temp;
+}
+
+void SerialSend(char body[], int length) {
+    char message[length + 3];
+    int i = 0;
+    message[0] = address;
+    message[1] = length;
+    for (i = 0; i < length; i++) {
+        message[i + 2] = body[i];
+    }
+    message[length + 2] = 0x00;
+    DE = 1;
+    putsUART1(message);
+    while (BusyUART1());
+    DE = 0;
 }
