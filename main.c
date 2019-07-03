@@ -57,17 +57,6 @@
 #define PAIRLED LATDbits.LATD1
 >>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
 
-<<<<<<< HEAD
-=======
-/*
-void delay(int t) { // 1 ms di delay
-    int n = t * 1900; //1900 Ã¨ un numero ricavato sperimentalmente
-    while (n > 0) {
-        n--;
-    }
-}
- */
->>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 
 void initializeUART();
 void initializePortsIO();
@@ -83,7 +72,6 @@ char state = StatePOR;
 char sendRdy = 1;
 char receiveRdy = 0;
 char emptyTx = 0;
-<<<<<<< HEAD
 char deviceList[4] = {0x01, 0x01, 0x02, 0x04}; // 0x01 = deviceID , 0x01 = deviceType(LED)
 char data = 0x00;
 char address = 0x00;
@@ -91,6 +79,7 @@ char matchedAddress = 0;
 int msgDuration = 0;
 char i = 0;
 char command;
+<<<<<<< HEAD
 =======
 char data;
 <<<<<<< HEAD
@@ -102,6 +91,8 @@ char address = 0x00;
 char str[7] = {'A', 'I', 'O', 'C', 'O', 'N', 'A'};
 >>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 >>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
+=======
+>>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
 
 int main(void) {
     /* per usarlo bisogna settare la heap memory nelle proprietà del progetto alla sezione linker -> xc23
@@ -253,6 +244,7 @@ int main(void) {
                 state = StateIDLE;
                 sendRdy = 0;
 <<<<<<< HEAD
+<<<<<<< HEAD
                 putcUART1('B'); // Transmit 'A' through UART
                 //putsUART1(str);
 =======
@@ -263,6 +255,8 @@ int main(void) {
                 //putsUART1(str);
 >>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 >>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
+=======
+>>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
                 break;
             case StateRECEIVE:
                 if (data == address) {
@@ -354,7 +348,6 @@ void initializePortsIO() {
     TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
-<<<<<<< HEAD
 //controllo se un bottone è stato premuto
 
 <<<<<<< HEAD
@@ -367,6 +360,7 @@ char CheckButton(unsigned port, int oldBtnIndex) {
 char CheckButton(unsigned port, int oldBtnIndex) {
     char temp = 0;
     if (oldButtonStates[oldBtnIndex] & !port) {
+<<<<<<< HEAD
 =======
 
 //controllo se un bottone Ã¨ stato premuto -- pull up
@@ -376,12 +370,14 @@ char CheckButton(unsigned port) {
     if (oldButtonState > newButtonState) {
 >>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
 >>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
+=======
+>>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
         temp = 1;
     }
     oldButtonStates[oldBtnIndex] = port;
     return temp;
 }
-<<<<<<< HEAD
+
 
 void SerialSend(char body[], int length) {
     char message[length + 3];
@@ -397,5 +393,3 @@ void SerialSend(char body[], int length) {
     while (BusyUART1());
     DE = 0;
 }
-=======
->>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
