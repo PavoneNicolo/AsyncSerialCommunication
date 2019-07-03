@@ -28,18 +28,6 @@
 #define StatePOR 0x00
 #define StatePAIRING 0x05
 #define StateIDLE 0x10
-<<<<<<< HEAD
-#define StateSEND 0x20
-#define StateRECEIVE 0x30
-#define StateFETCH 0x035
-#define StateIGNORE 0x038
-#define StateEMPTYTX 0x40
-#define SYSCLK 80000000L
-#define DESIRED_BAUDRATE 9600
-#define DE  LATDbits.LATD11
-#define PAIRLED LATDbits.LATD1
-#define PAIRBTN PORTDbits.RD0
-=======
 #define StateRECEIVE 0x20
 #define StateREAD 0x21
 #define StateDISCARD 0x22
@@ -55,19 +43,13 @@
 #define DE LATDbits.LATD11
 #define PAIRBTN PORTDbits.RD0
 #define PAIRLED LATDbits.LATD1
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
 
 
 void initializeUART();
 void initializePortsIO();
 char CheckButton(unsigned port, int oldBtnIndex);
-<<<<<<< HEAD
-
-int oldButtonStates [2] = {1, 1};
-=======
 void SerialSend(char body[], int length);
 int oldButtonStates[2] = {1, 1};
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
 char state = StatePOR;
 char sendRdy = 1;
 char receiveRdy = 0;
@@ -79,78 +61,23 @@ char matchedAddress = 0;
 int msgDuration = 0;
 char i = 0;
 char command;
-<<<<<<< HEAD
-=======
-char data;
-<<<<<<< HEAD
-char skipData = 0;
-char str[5] = {0xFF, 0x02, 0x02, 0x01, 0x00};
-
-char address = 0x00;
-=======
-char str[7] = {'A', 'I', 'O', 'C', 'O', 'N', 'A'};
->>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
-=======
->>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
 
 int main(void) {
-    /* per usarlo bisogna settare la heap memory nelle proprietà del progetto alla sezione linker -> xc23
-    int *buffer;
-    buffer = (int *) malloc(10 * sizeof (int));
-    */
     initializePortsIO();
     initializeUART();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
     char *msgBody;
 
-<<<<<<< HEAD
-    char d4Pressed;
-    char d2Pressed;
-=======
     int d4Pressed;
     int d2Pressed;
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
     LATDbits.LATD7 = 0;
-    PAIRLED = 0;
     DE = 0;
     PAIRLED = 0;
 
     while (1) {
 
         d4Pressed = CheckButton(PORTDbits.RD6, 0);
-<<<<<<< HEAD
-        d2Pressed = CheckButton(PORTDbits.RD4, 1);
-
-        switch (state) {
-            case StatePOR:
-                if (d2Pressed) {
-                    // mettere un timeout per farlo uscire dal pairing
-                    receiveRdy = 0;
-                    state = StatePAIRING;
-                    address = 0xFF;
-                    PAIRLED = 1;
-                }
-                break;
-            case StatePAIRING:
-                if (receiveRdy) {
-                    if (data == address) {
-                        DE = 1;
-                        putcUART1(0xFF);
-                        while (BusyUART1());
-                        DE = 0;
-                    } else {
-                        address = data;
-                        state = StateIDLE;
-                        DE = 1;
-                        putsUART1(str);
-                        while (BusyUART1());
-                        DE = 0;
-                    }
-                }
-                receiveRdy = 0;
-=======
         d2Pressed = CheckButton(PAIRBTN, 1);
 
 
@@ -165,7 +92,6 @@ int main(void) {
                     receiveRdy = 0;
                 }
 
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
                 break;
             case StatePAIRING:
                 if (receiveRdy) {
@@ -186,8 +112,6 @@ int main(void) {
                 break;
 
             case StateIDLE:
-                PAIRLED = 0;
-                // azzerare skipData se arriva 255/0XFF
                 if (emptyTx) {
                     //sendRdy = 0;
                     state = StateEMPTYTX;
@@ -238,51 +162,14 @@ int main(void) {
                     default:
                         break;
                 }
-
                 break;
             case StateSEND:
                 state = StateIDLE;
                 sendRdy = 0;
-<<<<<<< HEAD
-<<<<<<< HEAD
-                putcUART1('B'); // Transmit 'A' through UART
-                //putsUART1(str);
-=======
-<<<<<<< HEAD
-                putcUART1('A');
-=======
-                putcUART1('A'); // Transmit 'A' through UART
-                //putsUART1(str);
->>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
-=======
->>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
                 break;
             case StateRECEIVE:
-                if (data == address) {
-                    state = StateFETCH; //leggo i prossimi 2 byte
-                    receiveRdy = 0;
-                }
-
                 receiveRdy = 0;
                 state = StateIDLE; // torno in IDLE solo quando finisco di leggere i dati
-<<<<<<< HEAD
-                if (data == 'A') {
-                    LATDbits.LATD7 = LATDbits.LATD7 ^ 1;
-                }
-                break;
-                //case StateFETCH:
-                //skipData = lunghezza duration messaggio
-                //se devo scartare vado in StateIGNORE altrimenti vado in StateREAD
-                //break;
-            case StateIGNORE:
-                if (skipData == 0) {
-                    state = StateIDLE;
-                }
-                break;
-                //verrà sostituito dalla funzione che aspetterà che si svuoti il Tx
-            case StateEMPTYTX:
-=======
                 if (data == address)
                     matchedAddress = 1;
                 else
@@ -291,7 +178,6 @@ int main(void) {
                 msgDuration = data;
                 break;
             case StateEMPTYTX: //TODO fulminare questo state in quanto sarà incluso in un metodo di send futuro
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
                 while (BusyUART1());
                 DE = 0;
                 emptyTx = 0;
@@ -311,9 +197,8 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
         // Clear the RX interrupt Flag
         mU1RXClearIntFlag();
         // Read data from Rx
-        data = (char) ReadUART1();
+        data = (char) ReadUART1(); 
         receiveRdy = 1;
-        skipData--;
     }
     //chiama l'interrupt quando ha finito di trasmettere
     if (mU1TXGetIntFlag()) {
@@ -336,9 +221,6 @@ void initializeUART() {
 void initializePortsIO() {
     //R0 -- Rx D0 -> settato da config di UART
     //DI -- Tx D1 -> settato da config di UART
-    TRISDbits.TRISD1 = 0; // LED2 PAIRLED
-    TRISDbits.TRISD0 = 1; // D2 BTN
-    TRISDbits.TRISD4 = 1; // D2 BTN
     TRISGbits.TRISG6 = 1; //D13 bottone
     TRISDbits.TRISD6 = 1; //D4 bottone
     TRISDbits.TRISD1 = 0; //LED2
@@ -350,28 +232,9 @@ void initializePortsIO() {
 
 //controllo se un bottone è stato premuto
 
-<<<<<<< HEAD
-//controllo se un bottone è stato premuto
-
 char CheckButton(unsigned port, int oldBtnIndex) {
     char temp = 0;
     if (oldButtonStates[oldBtnIndex] & !port) {
-=======
-char CheckButton(unsigned port, int oldBtnIndex) {
-    char temp = 0;
-    if (oldButtonStates[oldBtnIndex] & !port) {
-<<<<<<< HEAD
-=======
-
-//controllo se un bottone Ã¨ stato premuto -- pull up
-char CheckButton(unsigned port) {
-    int temp = 0;
-    newButtonState = !port;
-    if (oldButtonState > newButtonState) {
->>>>>>> 9177fc2f4c2b34f4bbc58c7940fb477a37705f98
->>>>>>> 4d5ade0a3798d715c1c2aaae8d86388c6d5253c9
-=======
->>>>>>> 4b8afd172e10c521e6e14b7d18ee0abd0970dc08
         temp = 1;
     }
     oldButtonStates[oldBtnIndex] = port;
