@@ -344,6 +344,7 @@ void SerialSend(char body[], int length)
         ;
 
     DE = 0;
+<<<<<<< HEAD
 }
 
 int getDeviceData(char deviceID)
@@ -360,4 +361,6 @@ int getDeviceData(char deviceID)
         break;
     }
     return result;
+=======
+>>>>>>> be2ac4955e60d5a767de548eadb8243d893bdd09
 }
