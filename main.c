@@ -62,7 +62,11 @@ int msgDuration = 0;
 char i = 0;
 char command;
 
+
+
+
 int main(void) {
+    unsigned myport = PORTD;    
     initializePortsIO();
     initializeUART();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
