@@ -21,12 +21,15 @@
 #pragma config BWP = OFF         // Boot Flash Write Protect bit (Protection Disabled)
 #pragma config CP = OFF          // Code Protect (Protection Disabled)
 
+
 #include <p32xxxx.h>
 #include <plib.h> // Include the PIC32 Peripheral Library.
+#include "SG90.h"
 
 //STATES
 #define StatePOR 0x00
 #define StatePAIRING 0x05
+#define StatePAIRDISCARD 0x06
 #define StateIDLE 0x10
 #define StateRECEIVE 0x20
 #define StateREAD 0x21
@@ -35,6 +38,8 @@
 #define StateSEND 0x30
 #define StateEMPTYTX 0x35
 
+#define PAIRValue 0xFF
+
 #define CmdCOLLECT 0x01
 #define CmdCOMMAND 0x02
 
@@ -42,6 +47,8 @@
 #define DvcTEMP1_PIN PORTBbits.RB1
 #define DvcLED1_ID 0x02
 #define DvcLED1_PIN LATDbits.LATD7
+#define DvcHUM1_ID 0x03
+#define DvcHUM1_PIN PORTBbits.RB1
 
 #define SYSCLK 80000000L
 #define DESIRED_BAUDRATE 9600
@@ -52,17 +59,12 @@
 #define bitN(arg, n) (((arg) >> (n)) & 1)
 
 //FUNCTIONS
+void StartTimeout();
 void initializeUART();
 void initializePortsIO();
 char CheckButton(unsigned port, int oldBtnIndex);
 void SerialSend(char body[], int length);
 int getDeviceData(char deviceID);
-
-//typedef struct {
-//    char deviceID;
-//    char deviceType;
-//    int PortAddress;
-//} Device;
 
 int oldButtonStates[2] = {1, 1};
 char state = StatePOR;
@@ -72,224 +74,229 @@ char emptyTx = 0;
 char data = 0x00;
 char address = 0x00;
 char matchedAddress = 0;
-int msgDuration = 0;
+int dataLengthCounter = 0;
 char i = 0;
 char action;
+char timeoutCount = 0;
+char timeoutFlag = 0;
 
-void delay(int t)
-{
+void delay(int t) {
     int n = t * 1900;
-    while (n > 0)
-    {
+    while (n > 0) {
         n--;
     }
 }
-//const Device Led1 = {.deviceID = 0x01, .deviceType = 0x01, .PortAddress = 7 , .myPort = &PORTD};
-//const Device Temp1 = {.deviceID = 0x02, .deviceType = 0x02, .PortAddress = 9 , .myPort = &LATD};
 
-//    //TODO da fare struct per device *(Pavo ï¿½ un pavone e non vuole le struct)
-//    Device deviceList[2] = {Led1, Temp1}; // 0x01 = deviceID , 0x14 = deviceType(LED)
+int main(void) {
+        SYSTEMConfigPerformance(SYSCLK);
 
-int main(void)
-{
     initializePortsIO();
     initializeUART();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
+    OpenTimer2(T2_ON | T2_SOURCE_INT | T2_PS_1_256, 0xf423); // Timeout 20s (con count a 100)
+
     int temp;
     char *msgBody;
-    char collectResponse[3] = {0x00, 0x00, 0x00};
+    char discardPair[2] = {0x00, 0x00};
+    char collectResponse[3] = {0x01, 0x01, 0x01};
     char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
     int d4Pressed;
     int d2Pressed;
     LATDbits.LATD7 = 0;
     DE = 0;
     PAIRLED = 0;
-    int currentMsgDuration = 0;
-    int size = 0;
-    while (1)
-    {
+    int dataLength = 0;
+    while (1) {
 
-        d4Pressed = CheckButton(PORTDbits.RD6, 0);
+        //        d4Pressed = CheckButton(PORTDbits.RD6, 0);
         d2Pressed = CheckButton(PAIRBTN, 1);
 
-        switch (state)
-        {
-        case StatePOR:
-            //stato di primo boot :(address = 0;)
-            //non ï¿½ nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
-            if (d2Pressed)
-            {
-                PAIRLED = 1;
-                address = 0xFF;
-                state = StatePAIRING;
-                receiveRdy = 0;
-            }
-            break;
-        case StatePAIRING:
-            if (receiveRdy)
-            {
-                if (data == address)
-                {
-                    DE = 1;
-                    putcUART1(0xFF);
-                    while (BusyUART1())
-                        ;
-                    DE = 0;
+        switch (state) {
+            case StatePOR:
+                //stato di primo boot :(address = 0;)
+                //non ? nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
+                PAIRLED = 0;
+                if (d2Pressed) {
+                    PAIRLED = 1;
+                    address = 0xFF;
+                    state = StatePAIRING;
+                    receiveRdy = 0;    
+                    StartTimeout();
                 }
-                else
-                {
-                    address = data;
-                    state = StateIDLE;
-                    PAIRLED = 0;
-                    int length = sizeof(deviceList) / sizeof(char);
-                    SerialSend(deviceList, length);
-                }
-                receiveRdy = 0;
-            }
-            break;
-        case StateIDLE:
-            if (emptyTx)
-            {
-                //sendRdy = 0;
-                state = StateEMPTYTX;
-            }
-            if (d4Pressed && sendRdy)
-            {
-                DE = 1;
-                state = StateSEND;
-            }
-            if (receiveRdy)
-            {
-                state = StateRECEIVE;
-                if (msgDuration > 0)
-                {
-                    if (matchedAddress)
-                    {
-                        state = StateREAD;
+                break;
+            case StatePAIRING:
+
+                if (receiveRdy) {
+
+                    if (data == address) {
+                        DE = 1;
+                        putcUART1(0xFF);
+                        while (BusyUART1());
+                        DE = 0;
+                    } else {
+                        address = data;
+                        state = StateIDLE;
+                        PAIRLED = 0;
+                        int length = sizeof (deviceList) / sizeof (char);
+                        SerialSend(deviceList, length);
                     }
-                    else
-                    {
-                        state = StateDISCARD;
-                    }
+                    receiveRdy = 0;
+                    
                 }
-                receiveRdy = 0;
-            }
-            break;
-        case StateREAD:
-            //malloc richiede memoria nell'heap, assegnata nelle proprietï¿½ del progetto
-            msgBody = (char *)malloc(msgDuration * sizeof(char));
-            size = sizeof(msgBody) / sizeof(char);
-            //L'errore Ã¨ qua
-            while (msgDuration != 0)
-            {
-                if (receiveRdy)
-                {
-                    //praticamente dato che passa prima nell'interrupt msgDuration Ã¨ stato giÃ  decrementato e quindi si sfancula
-                    msgBody[currentMsgDuration - msgDuration - 1] = data;
+                
+                if (timeoutFlag) {
+                    state = StatePOR;
+                }
+                break;
+            case StateIDLE:
+                //                if (emptyTx) {
+                //                    //sendRdy = 0;
+                //                    state = StateEMPTYTX;
+                //                }
+                //                if (d4Pressed && sendRdy) {
+                //                    DE = 1;
+                //                    state = StateSEND;
+                //                } 
+                if (receiveRdy) {
+                    state = StateRECEIVE;
+                    if (dataLengthCounter > 0) {
+                        if (matchedAddress) {
+                            state = StateREAD;
+                        } else {
+                            state = StateDISCARD;
+                        }
+                    }
                     receiveRdy = 0;
                 }
-            }
-            state = StatePROCESS;
-            break;
-        case StateDISCARD:
-            if (msgDuration == 0)
-            {
-                state = StateIDLE;
-                matchedAddress = 0;
-            }
-            break;
-        case StatePROCESS:
-            action = msgBody[0];
-            switch (action)
-            {
-            case CmdCOLLECT:
-                //ciclo molteplici device che sono richiesti nel body
-                //                        for (i = 0; i< sizeof (msgBody) - 1; i++) {
-                //                            //TODO
-                ////                            getDeviceData(msgBody[i]);
-                //                            // usare questi DeviceID per fare cose
-                //                        }
-                //ciclo un device singolo
-                temp = getDeviceData(msgBody[1]);
-                collectResponse[0] = 0x01;
-                collectResponse[1] = (char)(temp & 0xFF);
-                collectResponse[2] = (char)(temp >> 8);
-
                 break;
-            case CmdCOMMAND:
-                for (i = 0; i < sizeof(msgBody) - 1; i++)
-                {
-                    //TODO
-                    // usare questi DeviceID per fare cose
+            case StateREAD:
+                //malloc richiede memoria nell'heap, assegnata nelle propriet? del progetto
+                msgBody = (char *) malloc(dataLengthCounter * sizeof (char));
+                while (dataLengthCounter != 0) {
+                    if (receiveRdy) {
+                        //praticamente dato che passa prima nell'interrupt msgDuration è stato già decrementato e quindi si sfancula
+                        msgBody[dataLength - dataLengthCounter] = data;
+                        receiveRdy = 0;
+                        dataLengthCounter--;
+                    }
+                }
+                state = StatePROCESS;
+                break;
+            case StateDISCARD:
+                while (dataLengthCounter != 0) {
+                    if (receiveRdy) {
+                        //praticamente dato che passa prima nell'interrupt msgDuration è stato già decrementato e quindi si sfancula
+                        //                        msgBody[size - msgDuration] = data;
+                        receiveRdy = 0;
+                        dataLengthCounter--;
+                    }
+                }
+                state = StateIDLE;
+                //                if (msgDuration == 0) {
+                //                    state = StateIDLE;
+                //                    matchedAddress = 0;
+                //                }
+                break;
+            case StatePROCESS:
+                action = msgBody[0];
+                switch (action) {
+                    case CmdCOLLECT:
+                        //ciclo molteplici device che sono richiesti nel body
+                        //                        for (i = 0; i< sizeof (msgBody) - 1; i++) {
+                        //                            //TODO
+                        ////                            getDeviceData(msgBody[i]);
+                        //                            // usare questi DeviceID per fare cose
+                        //                        }
+                        //ciclo un device singolo
+                        temp = getDeviceData(msgBody[1]);
+                        collectResponse[0] = 0x01;
+                        collectResponse[1] = (char) (temp & 0xFF);
+                        collectResponse[2] = (char) (temp >> 8);
+                        break;
+                    case CmdCOMMAND:
+                        for (i = 0; i < sizeof (msgBody) - 1; i++) {
+                            //TODO
+                            // usare questi DeviceID per fare cose
+                        }
+                        break;
+                    default:
+                        //TODO come ultima cosa magari: Controllo errori
+                        break;
+                }
+                state = StateSEND;
+                break;
+            case StateSEND:
+                state = StateIDLE;
+                sendRdy = 0;
+                int length = sizeof (collectResponse) / sizeof (char);
+                SerialSend(collectResponse, length);
+                break;
+            case StateRECEIVE:
+                receiveRdy = 0;
+                matchedAddress = 0;
+                if (data == 0xff) {
+                    state = StatePAIRDISCARD;
+                } else {
+                    if (data == address) {
+                        matchedAddress = 1;
+                    }
+                    state = StateIDLE;
+                    while (!receiveRdy);
+                    dataLengthCounter = data;
+                    dataLength = dataLengthCounter;
                 }
                 break;
-            default:
-                //TODO come ultima cosa magari: Controllo errori
+            case StatePAIRDISCARD:
+                StartTimeout();
+                if (timeoutFlag) {
+                    state = StateIDLE;
+                }
+                if (receiveRdy) {
+                    receiveRdy = 0;
+                    if (data != 0xFF) {
+                        state = StateIDLE;
+                    }
+                }
                 break;
-            }
-            state = StateSEND;
-            break;
-        case StateSEND:
-            state = StateIDLE;
-            sendRdy = 0;
-            int length = sizeof(collectResponse) / sizeof(char);
-            SerialSend(collectResponse, length);
-            break;
-        case StateRECEIVE:
-            receiveRdy = 0;
-            state = StateIDLE; // torno in IDLE solo quando finisco di leggere i dati
-            if (data == address)
-            {
-                matchedAddress = 1;
-            }
-            else
-            {
-                matchedAddress = 0;
-            }
-            while (!receiveRdy)
-                ;
-            msgDuration = data;
-            currentMsgDuration = msgDuration;
-            break;
-        case StateEMPTYTX: //TODO fulminare questo state in quanto sarï¿½ incluso in un metodo di send futuro
-            while (BusyUART1())
-                ;
-            DE = 0;
-            emptyTx = 0;
-            sendRdy = 1;
-            state = StateIDLE;
-            break;
-        default:
-            break;
+                //            case StateEMPTYTX: //TODO fulminare questo state in quanto sar? incluso in un metodo di send futuro
+                //                while (BusyUART1())
+                //                    ;
+                //                DE = 0;
+                //                emptyTx = 0;
+                //                sendRdy = 1;
+                //                state = StateIDLE;
+                //                break;
+            default:
+                break;
         }
     }
     return 1;
 }
 
-void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void)
-{
+void StartTimeout() {
+    timeoutFlag = 0;
+    timeoutCount = 0;
+    ConfigIntTimer2(T2_INT_ON | T2_INT_PRIOR_2);
+}
+
+void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
     // Is this an RX interrupt?
-    if (mU1RXGetIntFlag())
-    {
+    if (mU1RXGetIntFlag()) {
         // Clear the RX interrupt Flag
         mU1RXClearIntFlag();
         // Read data from Rx
-        data = (char)ReadUART1();
+        data = (char) ReadUART1();
         receiveRdy = 1;
-        msgDuration--;
     }
     //chiama l'interrupt quando ha finito di trasmettere
-    if (mU1TXGetIntFlag())
-    {
+    if (mU1TXGetIntFlag()) {
         mU1TXClearIntFlag();
         //sendRdy = 1;
-        emptyTx = 1;
     }
 }
 
-void initializeUART()
-{
+void initializeUART() {
     // Optimize PIC32 performance and return peripheral bus frequency
     unsigned int pbClk = SYSTEMConfig(SYSCLK, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
     // Abilita UART1 and set baud rate to DESIRED_BAUDRATE=9600
@@ -300,67 +307,74 @@ void initializeUART()
         ;
 }
 
-void initializePortsIO()
-{
+void initializePortsIO() {
     //R0 -- Rx D0 -> settato da config di UART
     //DI -- Tx D1 -> settato da config di UART
-    TRISGbits.TRISG6 = 1;  //D13 bottone
-    TRISDbits.TRISD6 = 1;  //D4 bottone
-    TRISDbits.TRISD1 = 0;  //LED2
-    TRISDbits.TRISD0 = 1;  //D2 BUT del pinguino
-    TRISDbits.TRISD4 = 1;  //D2 BUT del pinguino
-    TRISDbits.TRISD7 = 0;  //D5 LED
+    TRISDbits.TRISD6 = 0; //D4 tempsens
+    TRISDbits.TRISD1 = 0; //LED2
+    TRISDbits.TRISD0 = 1; //D2 BUT del pinguino
+    TRISDbits.TRISD4 = 1; //D2 BUT del pinguino
+    TRISDbits.TRISD7 = 0; //D5 LED
     TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
-//controllo se un bottone ï¿½ stato premuto
+//controllo se un bottone ? stato premuto
 
-char CheckButton(unsigned port, int oldBtnIndex)
-{
+char CheckButton(unsigned port, int oldBtnIndex) {
     char temp = 0;
-    if (oldButtonStates[oldBtnIndex] & !port)
-    {
+    if (oldButtonStates[oldBtnIndex] & !port) {
         temp = 1;
     }
     oldButtonStates[oldBtnIndex] = port;
     return temp;
 }
 
-void SerialSend(char body[], int length)
-{ //TODO aggiungere checksum??
+void SerialSend(char body[], int length) { //TODO aggiungere checksum??
     char message[length + 3];
     int i = 0;
     message[0] = address;
     message[1] = length;
-    for (i = 0; i < length; i++)
-    {
+    for (i = 0; i < length; i++) {
         message[i + 2] = body[i];
     }
     message[length + 2] = 0x00;
     DE = 1;
-
     putsUART1(message);
-    while (BusyUART1())
-        ;
-
+    while (BusyUART1());
     DE = 0;
-<<<<<<< HEAD
 }
 
-int getDeviceData(char deviceID)
-{
+int getDeviceData(char deviceID) {
     int result;
-    switch (deviceID)
-    {
-    case DvcLED1_ID:
-        //TODO rimpiazzare con adc di un motore o cose simili
-        result = 0x1111;
-        break;
-    case DvcTEMP1_ID:
-        result = 0x2222;
-        break;
+    switch (deviceID) {
+        case DvcLED1_ID:
+            //TODO rimpiazzare con adc di un motore o cose simili
+            result = 0x1111;
+            break;
+        case DvcTEMP1_ID:
+            //da mandare i 2 byte della temp
+
+            result = 0x2222;
+            break;
+        case DvcHUM1_ID:
+            //da mandare i 2 byte dell'hum
+            result = 0x3333;
+            break;
+        default:
+            result = 0xFFFF;
+            break;
     }
     return result;
-=======
->>>>>>> be2ac4955e60d5a767de548eadb8243d893bdd09
 }
+
+void __ISR(_TIMER_2_VECTOR, ipl2) handlesTimer2Ints(void) {
+    // **make sure iplx matches the timer?s interrupt priority level
+    timeoutCount++;
+    if (timeoutCount == 100) {
+        timeoutFlag = 1;
+        ConfigIntTimer2(T2_INT_OFF | T2_INT_PRIOR_2);
+
+    }
+    mT2ClearIntFlag();
+    // Clears the interrupt flag so that the program returns to the main loop
+} // END Timer2 ISR
