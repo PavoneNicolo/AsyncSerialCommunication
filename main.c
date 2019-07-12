@@ -24,7 +24,7 @@
 
 #include <p32xxxx.h>
 #include <plib.h> // Include the PIC32 Peripheral Library.
-#include "SG90.h"
+#include "DHT22.h"
 
 //STATES
 #define StatePOR 0x00
