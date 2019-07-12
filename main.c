@@ -43,14 +43,11 @@
 #define CmdCOLLECT 0x01
 #define CmdCOMMAND 0x02
 
-#define DvcTEMP1_ID 0x01
-#define DvcTEMP1_PIN PORTBbits.RB1
 #define DvcLED1_ID 0x02
 #define DvcLED1_PIN LATDbits.LATD7
-#define DvcHUM1_ID 0x03
-#define DvcHUM1_PIN PORTBbits.RB1
-#define DvcSERVO1_ID 0x04
-
+#define DvcLED2_ID 0x04
+#define DvcLED2_PIN LATBbits.LATB14
+#define DvcSERVO1_ID 0x03
 
 #define SYSCLK 80000000L
 #define DESIRED_BAUDRATE 9600
@@ -102,7 +99,7 @@ int main(void) {
     char *msgBody;
     char discardPair[2] = {0x00, 0x00};
     char collectResponse[3] = {0x01, 0x01, 0x01};
-    char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
+    char deviceList[4] = {DvcSERVO1_ID, 0x02, DvcLED1_ID, 0x01};
     int d4Pressed;
     int d2Pressed;
     unsigned char cmdID = 0;
@@ -120,12 +117,12 @@ int main(void) {
             case StatePOR:
                 //stato di primo boot :(address = 0;)
                 //non ? nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
-                PAIRLED = 0; 
+                PAIRLED = 0;
                 if (d2Pressed) {
                     PAIRLED = 1;
                     address = 0xFF;
                     state = StatePAIRING;
-                    receiveRdy = 0;    
+                    receiveRdy = 0;
                     StartTimeout();
                 }
                 break;
@@ -220,16 +217,30 @@ int main(void) {
                         for (i = 1; i < sizeof (msgBody) - 1; i++) {
                             //TODO
                             // usare questi DeviceID per fare cose
-                            
-                            if(i==1){ // è un device ID
+
+                            if (i == 1) { // è un device ID
                                 cmdID = msgBody[i];
-                            }else{ // è data
+                            } else { // è data
                                 cmdData = msgBody[i];
                             }
-                        } 
-                        switch(cmdID){
+                        }
+                        switch (cmdID) {
                             case DvcSERVO1_ID:
                                 goTo(cmdData);
+                                break;
+                            case DvcLED1_ID:
+                                if (cmdData == 0x00) {
+                                    DvcLED1_PIN = 0;
+                                } else {
+                                    DvcLED1_PIN = 1;
+                                }
+                                break;
+                            case DvcLED2_ID:
+                                if (cmdData == 0x00) {
+                                    DvcLED2_PIN = 0;
+                                } else {
+                                    DvcLED2_PIN = 1;
+                                }
                                 break;
                         }
                         break;
@@ -327,6 +338,7 @@ void initializePortsIO() {
     TRISDbits.TRISD0 = 1; //D2 BUT del pinguino
     TRISDbits.TRISD4 = 1; //D2 BUT del pinguino
     TRISDbits.TRISD7 = 0; //D5 LED
+    TRISBbits.TRISB14 = 0; //D9 DevLED2
     TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
@@ -360,16 +372,9 @@ int getDeviceData(char deviceID) {
     int result;
     switch (deviceID) {
         case DvcLED1_ID:
-            //TODO rimpiazzare con adc di un motore o cose simili
             result = 0x1111;
             break;
-        case DvcTEMP1_ID:
-            //da mandare i 2 byte della temp
-
-            result = 0x2222;
-            break;
-        case DvcHUM1_ID:
-            //da mandare i 2 byte dell'hum
+        case DvcLED2_ID:
             result = 0x3333;
             break;
         default:
