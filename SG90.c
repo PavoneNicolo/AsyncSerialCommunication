@@ -1,149 +1,57 @@
-/* ************************************************************************** */
-/** Descriptive File Name
+#include <p32xxxx.h>
+#include <plib.h> // Include the PIC32 Peripheral Library.
+#include "SG90.h"
 
-  @Company
-    Company Name
+int count = 0;
+int pwm = 0;
+int angle = 0;
+int targetAngle = 0;
+int increment = 0;
 
-  @File Name
-    filename.c
+void initServo(){
+    OpenTimer4(T4_ON | T4_SOURCE_INT | T4_PS_1_16, 0x0018); // 5 micro //  con 5 micro riesco a dividere 180 gradi in 200 step
+    OpenTimer3(T3_ON | T3_SOURCE_INT | T3_PS_1_32, 0xC34F); // 20 milli
+    INTEnableSystemMultiVectoredInt();
+    ConfigIntTimer3(T3_INT_ON | T3_INT_PRIOR_3); //timer3 sempre acceso 
+    TRISDbits.TRISD8 = 0;
+}
+void goTo(int target){
+    targetAngle=target;
+}
+long map(long x, long in_min, long in_max, long out_min, long out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+void __ISR(_TIMER_4_VECTOR, ipl4) handlesTimer4Ints(void) {
+    // **make sure iplx matches the timer?s interrupt priority level
+    //tengo alto motore per 1000 micro (200 count) , 
+    // per i prossimi 200 si deve fare un operazione
+    count++;
+    if (count <= (110 + pwm)) {
+        SERVO_PIN = 1;
+    } else {
+        SERVO_PIN = 0;
+        count = 0;
+        ConfigIntTimer4(T4_INT_OFF | T2_INT_PRIOR_4);
+    }    
+    mT4ClearIntFlag();
+    // Clears the interrupt flag so that the program returns to the main loop
+} // END Timer2 ISR
 
-  @Summary
-    Brief description of the file.
-
-  @Description
-    Describe the purpose of this file.
- */
-/* ************************************************************************** */
-
-/* ************************************************************************** */
-/* ************************************************************************** */
-/* Section: Included Files                                                    */
-/* ************************************************************************** */
-/* ************************************************************************** */
-
-/* This section lists the other files that are included in this file.
- */
-
-/* TODO:  Include other files here if needed. */
-
-
-/* ************************************************************************** */
-/* ************************************************************************** */
-/* Section: File Scope or Global Data                                         */
-/* ************************************************************************** */
-/* ************************************************************************** */
-
-/*  A brief description of a section can be given directly below the section
-    banner.
- */
-
-/* ************************************************************************** */
-/** Descriptive Data Item Name
-
-  @Summary
-    Brief one-line summary of the data item.
-    
-  @Description
-    Full description, explaining the purpose and usage of data item.
-    <p>
-    Additional description in consecutive paragraphs separated by HTML 
-    paragraph breaks, as necessary.
-    <p>
-    Type "JavaDoc" in the "How Do I?" IDE toolbar for more information on tags.
-    
-  @Remarks
-    Any additional remarks
- */
-int global_data;
-
-
-/* ************************************************************************** */
-/* ************************************************************************** */
-// Section: Local Functions                                                   */
-/* ************************************************************************** */
-/* ************************************************************************** */
-
-/*  A brief description of a section can be given directly below the section
-    banner.
- */
-
-/* ************************************************************************** */
-
-/** 
-  @Function
-    int ExampleLocalFunctionName ( int param1, int param2 ) 
-
-  @Summary
-    Brief one-line description of the function.
-
-  @Description
-    Full description, explaining the purpose and usage of the function.
-    <p>
-    Additional description in consecutive paragraphs separated by HTML 
-    paragraph breaks, as necessary.
-    <p>
-    Type "JavaDoc" in the "How Do I?" IDE toolbar for more information on tags.
-
-  @Precondition
-    List and describe any required preconditions. If there are no preconditions,
-    enter "None."
-
-  @Parameters
-    @param param1 Describe the first parameter to the function.
-    
-    @param param2 Describe the second parameter to the function.
-
-  @Returns
-    List (if feasible) and describe the return values of the function.
-    <ul>
-      <li>1   Indicates an error occurred
-      <li>0   Indicates an error did not occur
-    </ul>
-
-  @Remarks
-    Describe any special behavior not described above.
-    <p>
-    Any additional remarks.
-
-  @Example
-    @code
-    if(ExampleFunctionName(1, 2) == 0)
-    {
-        return 3;
+void __ISR(_TIMER_3_VECTOR, ipl3) handlesTimer3Ints(void) {
+    // **make sure iplx matches the timer?s interrupt priority level
+    if(angle == targetAngle){
+        increment = 0;
+    }else{
+        if(angle>targetAngle){
+            increment = -1;
+        }else{
+            increment = 1;
+        }
     }
- */
-static int ExampleLocalFunction(int param1, int param2) {
-    return 0;
+    angle+=increment;
+    pwm = map(angle, 0, 180, 0, 340);
+    ConfigIntTimer4(T4_INT_ON | T4_INT_PRIOR_4);
+    mT3ClearIntFlag();
+    // Clears the interrupt flag so that the program returns to the main loop
 }
 
-
-/* ************************************************************************** */
-/* ************************************************************************** */
-// Section: Interface Functions                                               */
-/* ************************************************************************** */
-/* ************************************************************************** */
-
-/*  A brief description of a section can be given directly below the section
-    banner.
- */
-
-// *****************************************************************************
-
-/** 
-  @Function
-    int ExampleInterfaceFunctionName ( int param1, int param2 ) 
-
-  @Summary
-    Brief one-line description of the function.
-
-  @Remarks
-    Refer to the example_file.h interface header for function usage details.
- */
-int ExampleInterfaceFunction(int param1, int param2) {
-    return 0;
-}
-
-
-/* *****************************************************************************
- End of File
- */

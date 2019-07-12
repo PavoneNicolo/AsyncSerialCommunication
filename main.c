@@ -49,6 +49,8 @@
 #define DvcLED1_PIN LATDbits.LATD7
 #define DvcHUM1_ID 0x03
 #define DvcHUM1_PIN PORTBbits.RB1
+#define DvcSERVO1_ID 0x04
+
 
 #define SYSCLK 80000000L
 #define DESIRED_BAUDRATE 9600
@@ -88,10 +90,10 @@ void delay(int t) {
 }
 
 int main(void) {
-        SYSTEMConfigPerformance(SYSCLK);
-
+    SYSTEMConfigPerformance(SYSCLK);
     initializePortsIO();
     initializeUART();
+    initServo();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
     OpenTimer2(T2_ON | T2_SOURCE_INT | T2_PS_1_256, 0xf423); // Timeout 20s (con count a 100)
@@ -103,6 +105,8 @@ int main(void) {
     char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
     int d4Pressed;
     int d2Pressed;
+    char cmdID = 0;
+    char cmdData[2] = {0x00,0x00};
     LATDbits.LATD7 = 0;
     DE = 0;
     PAIRLED = 0;
@@ -117,6 +121,7 @@ int main(void) {
                 //stato di primo boot :(address = 0;)
                 //non ? nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
                 PAIRLED = 0;
+
                 if (d2Pressed) {
                     PAIRLED = 1;
                     address = 0xFF;
@@ -215,9 +220,21 @@ int main(void) {
                         collectResponse[2] = (char) (temp >> 8);
                         break;
                     case CmdCOMMAND:
-                        for (i = 0; i < sizeof (msgBody) - 1; i++) {
+                        for (i = 1; i < sizeof (msgBody) - 1; i++) {
                             //TODO
                             // usare questi DeviceID per fare cose
+                            
+                            if((i-1)%3 == 0){ // è un device ID
+                                cmdID = msgBody[i];
+                            }else{ // è data
+                                cmdData[(i-1)%3] = msgBody[i];
+                            }
+                             
+                        } 
+                        switch(cmdID){
+                            case DvcSERVO1_ID:
+                                goTo(cmdData[1]);
+                                break;
                         }
                         break;
                     default:
@@ -303,8 +320,7 @@ void initializeUART() {
     OpenUART1(UART_EN | UART_ODD_PAR_8BIT, UART_RX_ENABLE | UART_TX_ENABLE, pbClk / 16 / DESIRED_BAUDRATE - 1);
     // Configure UART1 RX Interrupt
     ConfigIntUART1(UART_INT_PR2 | UART_RX_INT_EN | UART_TX_INT_EN);
-    while (BusyUART1())
-        ;
+    while (BusyUART1());
 }
 
 void initializePortsIO() {
@@ -373,7 +389,6 @@ void __ISR(_TIMER_2_VECTOR, ipl2) handlesTimer2Ints(void) {
     if (timeoutCount == 100) {
         timeoutFlag = 1;
         ConfigIntTimer2(T2_INT_OFF | T2_INT_PRIOR_2);
-
     }
     mT2ClearIntFlag();
     // Clears the interrupt flag so that the program returns to the main loop
