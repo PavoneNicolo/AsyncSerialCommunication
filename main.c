@@ -105,8 +105,8 @@ int main(void) {
     char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
     int d4Pressed;
     int d2Pressed;
-    char cmdID = 0;
-    char cmdData[2] = {0x00,0x00};
+    unsigned char cmdID = 0;
+    unsigned char cmdData = 0;
     LATDbits.LATD7 = 0;
     DE = 0;
     PAIRLED = 0;
@@ -120,8 +120,7 @@ int main(void) {
             case StatePOR:
                 //stato di primo boot :(address = 0;)
                 //non ? nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
-                PAIRLED = 0;
-
+                PAIRLED = 0; 
                 if (d2Pressed) {
                     PAIRLED = 1;
                     address = 0xFF;
@@ -147,9 +146,7 @@ int main(void) {
                         SerialSend(deviceList, length);
                     }
                     receiveRdy = 0;
-                    
                 }
-                
                 if (timeoutFlag) {
                     state = StatePOR;
                 }
@@ -224,16 +221,15 @@ int main(void) {
                             //TODO
                             // usare questi DeviceID per fare cose
                             
-                            if((i-1)%3 == 0){ // è un device ID
+                            if(i==1){ // è un device ID
                                 cmdID = msgBody[i];
                             }else{ // è data
-                                cmdData[(i-1)%3] = msgBody[i];
+                                cmdData = msgBody[i];
                             }
-                             
                         } 
                         switch(cmdID){
                             case DvcSERVO1_ID:
-                                goTo(cmdData[1]);
+                                goTo(cmdData);
                                 break;
                         }
                         break;
