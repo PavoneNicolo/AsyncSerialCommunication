@@ -93,7 +93,7 @@ int main(void) {
     SYSTEMConfigPerformance(SYSCLK);
     initializePortsIO();
     initializeUART();
-    initServo();
+    initDHT22();
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
     OpenTimer2(T2_ON | T2_SOURCE_INT | T2_PS_1_256, 0xf423); // Timeout 20s (con count a 100)
@@ -105,8 +105,9 @@ int main(void) {
     char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
     int d4Pressed;
     int d2Pressed;
-    char cmdID = 0;
-    char cmdData[2] = {0x00,0x00};
+    unsigned char cmdID = 0;
+    unsigned char cmdData = 0;
+    unsigned short tmpDHTData = 0;
     LATDbits.LATD7 = 0;
     DE = 0;
     PAIRLED = 0;
@@ -121,12 +122,11 @@ int main(void) {
                 //stato di primo boot :(address = 0;)
                 //non ? nel canale degli orfani, aspetto il BUT2 per mettermi in quel canale
                 PAIRLED = 0;
-
                 if (d2Pressed) {
                     PAIRLED = 1;
                     address = 0xFF;
                     state = StatePAIRING;
-                    receiveRdy = 0;    
+                    receiveRdy = 0;
                     StartTimeout();
                 }
                 break;
@@ -147,9 +147,7 @@ int main(void) {
                         SerialSend(deviceList, length);
                     }
                     receiveRdy = 0;
-                    
                 }
-                
                 if (timeoutFlag) {
                     state = StatePOR;
                 }
@@ -216,25 +214,18 @@ int main(void) {
                         //ciclo un device singolo
                         temp = getDeviceData(msgBody[1]);
                         collectResponse[0] = 0x01;
-                        collectResponse[1] = (char) (temp & 0xFF);
-                        collectResponse[2] = (char) (temp >> 8);
+                        collectResponse[1] = (char) (temp >> 8);
+                        collectResponse[2] = (char) (temp & 0xFF);
                         break;
                     case CmdCOMMAND:
                         for (i = 1; i < sizeof (msgBody) - 1; i++) {
                             //TODO
                             // usare questi DeviceID per fare cose
-                            
-                            if((i-1)%3 == 0){ // è un device ID
+                            if (i == 1) { // è un device ID
                                 cmdID = msgBody[i];
-                            }else{ // è data
-                                cmdData[(i-1)%3] = msgBody[i];
+                            } else { // è data
+                                cmdData = msgBody[i];
                             }
-                             
-                        } 
-                        switch(cmdID){
-                            case DvcSERVO1_ID:
-                                goTo(cmdData[1]);
-                                break;
                         }
                         break;
                     default:
@@ -369,12 +360,11 @@ int getDeviceData(char deviceID) {
             break;
         case DvcTEMP1_ID:
             //da mandare i 2 byte della temp
-
-            result = 0x2222;
+            result = readTemperature();
             break;
         case DvcHUM1_ID:
             //da mandare i 2 byte dell'hum
-            result = 0x3333;
+            result = readHumidity();
             break;
         default:
             result = 0xFFFF;
