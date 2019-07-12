@@ -11,7 +11,7 @@ int count = 0;
 int sigLength = 0;
 int iterator = 0;
 char retry = 0;
-char data[5];
+char dataDHT[5];
 int countBit = 0;
 
 void startSignal();
@@ -30,7 +30,7 @@ void initDHT22() {
 short readTemperature() {
     short temperature = 0;
 
-    data[0] = data[1] = data[2] = data[3] = data[4] = 0;
+    dataDHT[0] = dataDHT[1] = dataDHT[2] = dataDHT[3] = dataDHT[4] = 0;
 
     startSignal();
 
@@ -68,7 +68,7 @@ short readTemperature() {
         return temperature;
     }*/
     
-    temperature = (data[2] << 8) | data[3];
+    temperature = (dataDHT[2] << 8) | dataDHT[3];
 
     return temperature;
     
@@ -87,7 +87,7 @@ short readTemperature() {
 short readHumidity() {
     short hum = 0;
 
-    data[0] = data[1] = data[2] = data[3] = data[4] = 0;
+    dataDHT[0] = dataDHT[1] = dataDHT[2] = dataDHT[3] = dataDHT[4] = 0;
 
     startSignal();
 
@@ -125,7 +125,7 @@ short readHumidity() {
         return humidity;
     }*/
     
-    hum = ((data[0] << 8) | (data[1] & 0xFF)) & 0xFFFF;
+    hum = ((dataDHT[0] << 8) | (dataDHT[1] & 0xFF)) & 0xFFFF;
     
     return hum;
     
@@ -165,7 +165,7 @@ void readBit(int index) {
         while (DHT22_PIN_INPUT == 1); // riporta a 1 per mandare il bit
         ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
         if (sigLength > 50) { // 70us = bit a 1; 26-28us = bit a 0; parte dal più significativo
-            data[index / 8] = data[index / 8] | 1 << j;
+            dataDHT[index / 8] = dataDHT[index / 8] | 1 << j;
         }
 
         if (j == 0) {

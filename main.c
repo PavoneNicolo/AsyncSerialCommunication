@@ -49,7 +49,8 @@
 #define DvcLED1_PIN LATDbits.LATD7
 #define DvcHUM1_ID 0x03
 #define DvcHUM1_PIN PORTBbits.RB1
-#define DvcSERVO1_ID 0x04
+#define DvcLED2_ID 0x04
+#define DvcLED2_PIN LATBbits.LATB14
 
 
 #define SYSCLK 80000000L
@@ -103,11 +104,9 @@ int main(void) {
     char discardPair[2] = {0x00, 0x00};
     char collectResponse[3] = {0x01, 0x01, 0x01};
     char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
-    int d4Pressed;
     int d2Pressed;
     unsigned char cmdID = 0;
     unsigned char cmdData = 0;
-    unsigned short tmpDHTData = 0;
     LATDbits.LATD7 = 0;
     DE = 0;
     PAIRLED = 0;
@@ -115,7 +114,7 @@ int main(void) {
     while (1) {
 
         //        d4Pressed = CheckButton(PORTDbits.RD6, 0);
-        d2Pressed = CheckButton(PAIRBTN, 1);
+        d2Pressed = CheckButton(PAIRBTN,oldButtonStates[0]);
 
         switch (state) {
             case StatePOR:
@@ -219,13 +218,27 @@ int main(void) {
                         break;
                     case CmdCOMMAND:
                         for (i = 1; i < sizeof (msgBody) - 1; i++) {
-                            //TODO
-                            // usare questi DeviceID per fare cose
                             if (i == 1) { // è un device ID
                                 cmdID = msgBody[i];
                             } else { // è data
                                 cmdData = msgBody[i];
                             }
+                        }
+                        switch (cmdID) {
+                            case DvcLED1_ID:
+                                if (cmdData == 0x00) {
+                                    DvcLED1_PIN = 0;
+                                } else {
+                                    DvcLED1_PIN = 1;
+                                }
+                                break;
+                            case DvcLED2_ID:
+                                if (cmdData == 0x00) {
+                                    DvcLED2_PIN = 0;
+                                } else {
+                                    DvcLED2_PIN = 1;
+                                }
+                                break;
                         }
                         break;
                     default:
@@ -294,6 +307,7 @@ void __ISR(_UART1_VECTOR, ipl2) IntUart1Handler(void) {
         // Clear the RX interrupt Flag
         mU1RXClearIntFlag();
         // Read data from Rx
+        data = 0;
         data = (char) ReadUART1();
         receiveRdy = 1;
     }
@@ -321,7 +335,8 @@ void initializePortsIO() {
     TRISDbits.TRISD1 = 0; //LED2
     TRISDbits.TRISD0 = 1; //D2 BUT del pinguino
     TRISDbits.TRISD4 = 1; //D2 BUT del pinguino
-    TRISDbits.TRISD7 = 0; //D5 LED
+    TRISDbits.TRISD7 = 0; //D5 DevLED1
+    TRISBbits.TRISB14 = 0; //D9 DevLED2
     TRISDbits.TRISD11 = 0; //D7 DE  Send/Receive Enable
 }
 
