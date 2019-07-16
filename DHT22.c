@@ -13,40 +13,37 @@ int iterator = 0;
 char retry = 0;
 char dataDHT[5];
 int countBit = 0;
-
-void startSignal();
-void readBit(int index);
-void getSigLength();
+void startSignal(DHT22 DHT);
+void readBit(DHT22 DHT, int index);
+void getSigLength(DHT22 DHT);
 void delay_us(long us);
 
-void initDHT22() {
-    DHT22_PIN_STATE = 0;
-    DHT22_PIN_OUTPUT = 1;
+void initDHT22(DHT22 DHT){
+    PORTSetPinsDigitalOut(DHT.portId, DHT.pin);
     SYSTEMConfigPerformance(SYSCLK);
     INTEnableSystemMultiVectoredInt();
     OpenTimer3(T3_ON | T3_SOURCE_INT | T3_PS_1_16, 0x0004);
 }
 
-short readTemperature() {
+short readTemperature(DHT22 DHT) {
+    initDHT22(DHT);
     short temperature = 0;
-
     dataDHT[0] = dataDHT[1] = dataDHT[2] = dataDHT[3] = dataDHT[4] = 0;
-
-    startSignal();
-
-    getSigLength();
-    while (DHT22_PIN_INPUT == 1); // aspetto che il DHT risponda allo start signal
+    startSignal(DHT);
+    getSigLength(DHT);
+    while (PORTReadBits(DHT.portId, DHT.pin));
+    while (PORTReadBits(DHT.portId, DHT.pin)); // aspetto che il DHT risponda allo start signal
     ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
     if (sigLength < 100) { // DHT22 porta da alto a basso per 80us
 
-        getSigLength();
-        while (DHT22_PIN_INPUT == 0);
+        getSigLength(DHT);
+        while (~PORTReadBits(DHT.portId, DHT.pin));
         ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
 
         if (sigLength < 100) { // DHT22 porta da basso ad alto per 80us
             //Start procedure andata a buon fine
             for (iterator = 0; iterator < 40; iterator++) { // il DHT22 manda 40 bit di dati + checksum
-                readBit(iterator);
+                readBit(DHT ,iterator);
             }
         }
     }
@@ -67,43 +64,40 @@ short readTemperature() {
         retry = 0;
         return temperature;
     }*/
-    
+
     temperature = (dataDHT[2] << 8) | dataDHT[3];
 
     return temperature;
-    
-    
-    
-    
+
     //se il checksum non corrisponde riprovo per almeno 10 tentativi
     if (retry > 10) {
         return 0;
     }
 
     retry++;
-    return readTemperature();
+    return readTemperature(DHT);
 }
 
-short readHumidity() {
+short readHumidity(DHT22 DHT) {
+    initDHT22(DHT);
     short hum = 0;
-
     dataDHT[0] = dataDHT[1] = dataDHT[2] = dataDHT[3] = dataDHT[4] = 0;
 
-    startSignal();
+    startSignal(DHT);
 
-    getSigLength();
-    while (DHT22_PIN_INPUT == 1); // aspetto che il DHT risponda allo start signal
+    getSigLength(DHT);
+    while (PORTReadBits(DHT.portId, DHT.pin)); // aspetto che il DHT risponda allo start signal
     ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
     if (sigLength < 100) { // DHT22 porta da alto a basso per 80us
 
-        getSigLength();
-        while (DHT22_PIN_INPUT == 0);
+        getSigLength(DHT);
+        while (~PORTReadBits(DHT.portId, DHT.pin));
         ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
 
         if (sigLength < 100) { // DHT22 porta da basso ad alto per 80us
             //Start procedure andata a buon fine
             for (iterator = 0; iterator < 40; iterator++) { // il DHT22 manda 40 bit di dati + checksum
-                readBit(iterator);
+                readBit(DHT , iterator);
             }
         }
     }
@@ -124,45 +118,41 @@ short readHumidity() {
         retry = 0;
         return humidity;
     }*/
-    
+
     hum = ((dataDHT[0] << 8) | (dataDHT[1] & 0xFF)) & 0xFFFF;
-    
+
     return hum;
-    
-    
-    
-    
+
     //se il checksum non corrisponde riprovo per almeno 10 tentativi
     if (retry > 10) {
         return 0;
     }
-
     retry++;
-    return readHumidity();
+    return readHumidity(DHT);
 }
 
-void startSignal() {
-    DHT22_PIN_STATE = 0;
-    DHT22_PIN_OUTPUT = 0;
+void startSignal(DHT22 DHT) {
+    PORTSetPinsDigitalOut(DHT.portId, DHT.pin);
+    PORTClearBits(DHT.portId, DHT.pin);
     delay_us(1000);
-    DHT22_PIN_OUTPUT = 1;
+    PORTSetBits(DHT.portId, DHT.pin);
     delay_us(40);
-    DHT22_PIN_STATE = 1;
+    PORTSetPinsDigitalIn(DHT.portId, DHT.pin);
 }
 
-char j = 7; // PROVVISORIA -> DA ELIMINARE
+char j = 7; // PROVVISORIA . DA ELIMINARE
 
-void readBit(int index) {
+void readBit(DHT22 DHT ,int index) {
 
-    while (DHT22_PIN_INPUT == 1); // aspetto che il DHT22 porti da alto a basso
+    while (PORTReadBits(DHT.portId, DHT.pin)); // aspetto che il DHT22 porti da alto a basso
 
-    getSigLength();
-    while (DHT22_PIN_INPUT == 0);
+    getSigLength(DHT);
+    while (~PORTReadBits(DHT.portId, DHT.pin));
     ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
 
     if (sigLength < 100) { // 50us basso (prima di ogni bit)
-        getSigLength();
-        while (DHT22_PIN_INPUT == 1); // riporta a 1 per mandare il bit
+        getSigLength(DHT);
+        while (PORTReadBits(DHT.portId, DHT.pin)); // riporta a 1 per mandare il bit
         ConfigIntTimer3(T3_INT_OFF | T3_INT_PRIOR_3);
         if (sigLength > 50) { // 70us = bit a 1; 26-28us = bit a 0; parte dal più significativo
             dataDHT[index / 8] = dataDHT[index / 8] | 1 << j;
@@ -176,7 +166,7 @@ void readBit(int index) {
     countBit++;
 }
 
-void getSigLength() {
+void getSigLength(DHT22 DHT) {
     sigLength = 0;
     ConfigIntTimer3(T3_INT_ON | T3_INT_PRIOR_3);
 }

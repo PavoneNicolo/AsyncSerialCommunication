@@ -43,13 +43,17 @@
 #define CmdCOLLECT 0x01
 #define CmdCOMMAND 0x02
 
-#define DvcTEMP1_ID 0x01
-#define DvcTEMP1_PIN PORTBbits.RB1
-#define DvcLED1_ID 0x02
+#define DvcTEMP1_ID 0x03
+#define DvcTEMP1_PIN PORTBbits.RB1 
+#define DvcTEMP2_ID 0x04
+#define DvcTEMP2_PIN PORTGbits.RG8 
+#define DvcLED1_ID 0x01
 #define DvcLED1_PIN LATDbits.LATD7
-#define DvcHUM1_ID 0x03
+#define DvcHUM1_ID 0x05
 #define DvcHUM1_PIN PORTBbits.RB1
-#define DvcLED2_ID 0x04
+#define DvcHUM2_ID 0x06
+#define DvcHUM2_PIN PORTGbits.RG8
+#define DvcLED2_ID 0x02
 #define DvcLED2_PIN LATBbits.LATB14
 
 
@@ -82,6 +86,10 @@ char i = 0;
 char action;
 char timeoutCount = 0;
 char timeoutFlag = 0;
+struct DHT22 dht1 = {IOPORT_B, BIT_1};
+struct DHT22 dht2 = {IOPORT_G, BIT_8};
+
+//struct DHT22 dht2 = DHT22.new(IOPORT_B , BIT_2);
 
 void delay(int t) {
     int n = t * 1900;
@@ -94,7 +102,7 @@ int main(void) {
     SYSTEMConfigPerformance(SYSCLK);
     initializePortsIO();
     initializeUART();
-    initDHT22();
+
     // Must enable glocal interrupts - in this case, we are using multi-vector mode
     INTEnableSystemMultiVectoredInt();
     OpenTimer2(T2_ON | T2_SOURCE_INT | T2_PS_1_256, 0xf423); // Timeout 20s (con count a 100)
@@ -375,11 +383,11 @@ int getDeviceData(char deviceID) {
             break;
         case DvcTEMP1_ID:
             //da mandare i 2 byte della temp
-            result = readTemperature();
+            result = readTemperature(dht1);
             break;
         case DvcHUM1_ID:
             //da mandare i 2 byte dell'hum
-            result = readHumidity();
+            result = readHumidity(dht1);
             break;
         default:
             result = 0xFFFF;

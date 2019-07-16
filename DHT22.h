@@ -1,6 +1,12 @@
 #include <p32xxxx.h>
 #include <plib.h> // Include the PIC32 Peripheral Library.
+//void initDHT22();
+typedef struct DHT22{
+    IoPortId portId;
+    unsigned int pin;
+}DHT22;
 
-void initDHT22();
-short readTemperature();
-short readHumidity();
+short readTemperature(DHT22 DHT);
+short readHumidity(DHT22 DHT);
+
+
