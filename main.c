@@ -212,12 +212,7 @@ int main(void) {
                 action = msgBody[0];
                 switch (action) {
                     case CmdCOLLECT:
-                        //ciclo molteplici device che sono richiesti nel body
-                        //                        for (i = 0; i< sizeof (msgBody) - 1; i++) {
-                        //                            //TODO
-                        ////                            getDeviceData(msgBody[i]);
-                        //                            // usare questi DeviceID per fare cose
-                        //                        }
+                        
                         //ciclo un device singolo
                         temp = getDeviceData(msgBody[1]);
                         collectResponse[0] = 0x01;
@@ -248,6 +243,10 @@ int main(void) {
                                 }
                                 break;
                         }
+                        temp = getDeviceData(msgBody[1]);
+                        collectResponse[0] = 0x01;
+                        collectResponse[1] = (char) (temp >> 8);
+                        collectResponse[2] = (char) (temp & 0xFF);
                         break;
                     default:
                         //TODO come ultima cosa magari: Controllo errori
