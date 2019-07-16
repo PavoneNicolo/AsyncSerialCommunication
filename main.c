@@ -44,13 +44,13 @@
 #define CmdCOMMAND 0x02
 
 #define DvcTEMP1_ID 0x03
-#define DvcTEMP1_PIN PORTBbits.RB1 
+#define DvcTEMP1_PIN PORTDbits.RD6
 #define DvcTEMP2_ID 0x04
 #define DvcTEMP2_PIN PORTGbits.RG8 
 #define DvcLED1_ID 0x01
 #define DvcLED1_PIN LATDbits.LATD7
 #define DvcHUM1_ID 0x05
-#define DvcHUM1_PIN PORTBbits.RB1
+#define DvcHUM1_PIN PORTDbits.RD6
 #define DvcHUM2_ID 0x06
 #define DvcHUM2_PIN PORTGbits.RG8
 #define DvcLED2_ID 0x02
@@ -86,7 +86,7 @@ char i = 0;
 char action;
 char timeoutCount = 0;
 char timeoutFlag = 0;
-struct DHT22 dht1 = {IOPORT_B, BIT_1};
+struct DHT22 dht1 = {IOPORT_D, BIT_6};
 struct DHT22 dht2 = {IOPORT_G, BIT_8};
 
 //struct DHT22 dht2 = DHT22.new(IOPORT_B , BIT_2);
@@ -111,7 +111,7 @@ int main(void) {
     char *msgBody;
     char discardPair[2] = {0x00, 0x00};
     char collectResponse[3] = {0x01, 0x01, 0x01};
-    char deviceList[4] = {DvcTEMP1_ID, 0x02, DvcLED1_ID, 0x01};
+    char deviceList[12] = {DvcLED1_ID, 0x01, DvcLED2_ID, 0x01, DvcTEMP1_ID, 0x03,DvcTEMP2_ID, 0x03, DvcHUM1_ID , 0x04 , DvcHUM2_ID , 0x04};
     int d2Pressed;
     unsigned char cmdID = 0;
     unsigned char cmdData = 0;
@@ -122,7 +122,7 @@ int main(void) {
     while (1) {
 
         //        d4Pressed = CheckButton(PORTDbits.RD6, 0);
-        d2Pressed = CheckButton(PAIRBTN,oldButtonStates[0]);
+        d2Pressed = CheckButton(PAIRBTN, oldButtonStates[0]);
 
         switch (state) {
             case StatePOR:
@@ -388,6 +388,14 @@ int getDeviceData(char deviceID) {
         case DvcHUM1_ID:
             //da mandare i 2 byte dell'hum
             result = readHumidity(dht1);
+            break;
+        case DvcTEMP2_ID:
+            //da mandare i 2 byte della temp
+            result = readTemperature(dht2);
+            break;
+        case DvcHUM2_ID:
+            //da mandare i 2 byte dell'hum
+            result = readHumidity(dht2);
             break;
         default:
             result = 0xFFFF;
