@@ -61,7 +61,7 @@ short readTemperature(DHT22 DHT) {
         return temperature;
     }*/
 
-    temperature = (dataDHT[2] << 8) | dataDHT[3];
+    temperature = ((dataDHT[2] << 8) | (dataDHT[3] & 0xFF)) & 0xFFFF;
 
     return temperature;
 

@@ -366,9 +366,12 @@ void SerialSend(char body[], int length) { //TODO aggiungere checksum??
     for (i = 0; i < length; i++) {
         message[i + 2] = body[i];
     }
-    message[length + 2] = 0x00;
+//    message[length + 2] = 0x00;
     DE = 1;
-    putsUART1(message);
+    for(i = 0 ; i< length;  i++ ){
+        putcUART1(message[i]);
+    }
+//    putsUART1(message);
     while (BusyUART1());
     DE = 0;
 }
